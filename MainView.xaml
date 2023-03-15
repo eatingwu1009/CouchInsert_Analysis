@@ -109,12 +109,12 @@
                 <RowDefinition Height="40"/>
                 <RowDefinition Height="40"/>
                 <RowDefinition Height="40"/>
+                <RowDefinition Height="40"/>
             </Grid.RowDefinitions>
-            <Label Grid.Row="2" Content=""  Foreground="white" FontWeight="Bold" FontSize="16" HorizontalAlignment="Left"/>
             <Label Grid.Row="0" Content="Couch Model Output"  Foreground="white" FontWeight="Bold" FontSize="16" HorizontalAlignment="Left"/>
             <Button Grid.Row="2" Content="FilePath" Command="{Binding ButtonCommand_FilePath}" FontSize="14" FontWeight="Bold" Cursor="Hand" HorizontalAlignment="Left" FontFamily="Segoe UI Light" Style="{StaticResource ButtonStyle}" Margin="200,0,0,10" Grid.ColumnSpan="2"/>
             <Button Grid.Row="2" Content="BuildModel" Command="{Binding ButtonCommand_BuildModel}" FontSize="14" FontWeight="Bold" Cursor="Hand" HorizontalAlignment="Left" FontFamily="Segoe UI Light" Style="{StaticResource ButtonStyle}" Margin="290,0,0,10" Grid.ColumnSpan="2"/>
-            <Label Grid.Row="1" Content="Please Chk Your Couch Names : CouchInterior, CouchSurface, CrossInterior, CrossSurface"  Foreground="white"  FontSize="12" Grid.ColumnSpan="3" />
+            <Label Grid.Row="1" Content=" Couch Names : CouchInterior, CouchSurface, CrossInterior, CrossSurface"  Foreground="white"  FontSize="12" Grid.ColumnSpan="3" />
         </Grid>
 
     </StackPanel>

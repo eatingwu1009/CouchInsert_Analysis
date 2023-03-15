@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Windows.Input;
+using System.Windows.Media.Media3D;
 using System.Windows.Shapes;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
@@ -196,8 +198,50 @@ namespace CouchInsert
         public StructureSet StructureSet { get; }
         public VVector SIU { get; }
         public ImageProfile XProfile { get; }
-        public Structure CouchInterior { get; set; }
-        public Structure CouchSurface { get; set; }
+       
+        private Structure _couchInterior;
+        public Structure CouchInterior
+        {
+            get => _couchInterior;
+            set
+            {
+                _couchInterior = value;
+                NotifyPropertyChanged(nameof(CouchInterior));
+            }
+        }
+
+        private Structure _couchSurface;
+        public Structure CouchSurface
+        {
+            get => _couchSurface;
+            set
+            {
+                _couchSurface = value;
+                NotifyPropertyChanged(nameof(CouchSurface));
+            }
+        }
+
+        private Structure _crossInterior;
+        public Structure CrossInterior
+        {
+            get => _crossInterior;
+            set
+            {
+                _crossInterior = value;
+                NotifyPropertyChanged(nameof(CrossInterior));
+            }
+        }
+
+        private Structure _crossSurface;
+        public Structure CrossSurface
+        {
+            get => _crossSurface;
+            set
+            {
+                _crossSurface = value;
+                NotifyPropertyChanged(nameof(CrossSurface));
+            }
+        }
         public IReadOnlyList<Structure> couchStructureList { get; }
         public double HSpace { get; set; }
         public double XBaseAxis { get; set; }
@@ -252,6 +296,10 @@ namespace CouchInsert
             FilePathCSI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossInterior.csv";
             FilePathCSS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossSurface.csv";
             FilePathAxis = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\AxisAlign.csv";
+            CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
+            CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
+            CrossInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossInterior");
+            CrossSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossSurface");
 
             VVector start = new VVector(-ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
             VVector stop = new VVector(ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
@@ -306,8 +354,8 @@ namespace CouchInsert
                 return;
             }
 
-            string[] filelines = File.ReadAllLines(FilePathCSI);
-            List<VVector> outer = new List<VVector>();
+            string[] filelines = File.ReadAllLines(FilePathCI);
+            Point3DCollection outer = new Point3DCollection();
             try
             {
                 foreach (string line in filelines)
@@ -316,7 +364,7 @@ namespace CouchInsert
                     double x = Double.Parse(splitLine[0].Trim());
                     double y = Double.Parse(splitLine[1].Trim());
                     double z = Double.Parse(splitLine[2].Trim());
-                    outer.Add(new VVector(x, y, z));
+                    outer.Add(new Point3D(x, y, z));
                 }
             }
             catch
@@ -324,17 +372,22 @@ namespace CouchInsert
                 System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
                 return;
             }
+            ScriptContext.Patient.BeginModifications();
+            if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
+            Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
+            //XYZ.MeshGeometry.Positions = outer;
+
             string[] filelines1 = File.ReadAllLines(FilePathCSS);
-            List<VVector> inner = new List<VVector>();
+            List<VVector> outer1 = new List<VVector>();
             try
             {
                 foreach (string line1 in filelines1)
                 {
                     string[] splitLine1 = line1.Split(',');
-                    double xx = Double.Parse(splitLine1[0].Trim());
-                    double yy = Double.Parse(splitLine1[1].Trim());
-                    double zz = Double.Parse(splitLine1[2].Trim());
-                    inner.Add(new VVector(xx, yy, zz));
+                    double x = Double.Parse(splitLine1[0].Trim());
+                    double y = Double.Parse(splitLine1[1].Trim());
+                    double z = Double.Parse(splitLine1[2].Trim());
+                    outer1.Add(new VVector(x, y, z));
                 }
             }
             catch
@@ -342,30 +395,21 @@ namespace CouchInsert
                 System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
                 return;
             }
+            if (StructureSet.Structures.Any(s => s.Id == "PQR")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "PQR"));
+            Structure PQR = ScriptContext.StructureSet.AddStructure("CONTROL", "PQR");
+            for (int i = 0; i < 10; i++)
+            {
+                PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+            }
 
             //double Xmin = Math.Min(outer.);
 
             //double[] AddAxis = AxisAlignment(SelectedMarkerPosition, Xmin, Ymin, Zmin);
-            //ScriptContext.Patient.BeginModifications();
-            //Structure CrossSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossSurface");
-            //for (int i = 0; i < Zmin + AddAxis[2]; i++)
-            //{
-            //    CrossSurface.AddContourOnImagePlane(outer.Select(v => new VVector(v.x + AddAxis[0], v.y + AddAxis[1], v.z + AddAxis[2])).ToArray(), i);
-            //}
-            ScriptContext.Patient.BeginModifications();
-            if (StructureSet.Structures.Any(s => s.Id == "CrossInterior")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossInterior"));
-            Structure CrossInterior = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossInterior");
-            for (int i = 0; i < 10; i++)
-            {
-                CrossInterior.AddContourOnImagePlane(inner.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
-            }
-            if (StructureSet.Structures.Any(s => s.Id == "CrossSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossSurface"));
-            Structure CrossSurface = ScriptContext.StructureSet.AddStructure("AVOIDANCE", "CrossSurface");
-            for (int i = 0; i < 10; i++)
-            {
-                CrossSurface.AddContourOnImagePlane(outer.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
-            }
-            //CrossSurface.SegmentVolume = CrossSurface.SegmentVolume.Sub(CrossInterior.SegmentVolume);
+
+
+            //Structure ABC = StructureSet.Structures.FirstOrDefault(e => e.Id == "ABC");
+            //Structure DEF = StructureSet.Structures.FirstOrDefault(e => e.Id == "DEF");
+            //ABC.SegmentVolume = ABC.SegmentVolume.Sub(DEF.SegmentVolume);
 
 
             //Structure CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
@@ -422,21 +466,16 @@ namespace CouchInsert
         public ICommand ButtonCommand_BuildModel { get => new Command(BuildModel); }
         private void BuildModel()
         {
-            Structure CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
-            Structure CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
-            Structure CrossInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossInterior");
-            Structure CrossSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossSurface");
             if (CouchInterior != null)
             {
-                for (int i = 0; i < ScriptContext.Image.ZSize; i++)
+                Point3DCollection vertexes = CouchInterior.MeshGeometry.Positions;
+                using (StreamWriter writer = new StreamWriter(FilePathCI))
                 {
-                    foreach (VVector[] vectors in CouchInterior.GetContoursOnImagePlane(i))
+                    foreach (Point3D v in vertexes)
                     {
-                        using (StreamWriter writer = new StreamWriter(FilePathCI))
-                        {
-                            writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}" + i + "\n ")));
-                        }
-                    }
+                        writer.Write(v.X + "," + v.Y + "," + v.Z);
+                        writer.WriteLine();
+                     }
                 }
             }
             if (CouchSurface != null)
