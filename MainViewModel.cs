@@ -3,12 +3,20 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Reflection;
+using System.Net.NetworkInformation;
+using System.Runtime.Remoting.Contexts;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Xml;
+using System.Reflection;
 using System.Windows.Media.Media3D;
 using System.Windows.Shapes;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
+using System.Text.RegularExpressions;
 
 
 namespace CouchInsert
@@ -173,13 +181,13 @@ namespace CouchInsert
         }
 
         private String _filePathAxis;
-        public String FilePathAxis
+        public String FilePathBasic
         {
             get => _filePathAxis;
             set
             {
                 _filePathAxis = value;
-                NotifyPropertyChanged(nameof(FilePathAxis));
+                NotifyPropertyChanged(nameof(FilePathBasic));
             }
         }
 
@@ -263,22 +271,6 @@ namespace CouchInsert
             SIU = scriptContext.Image.UserOrigin;
             StructureSet = scriptContext.StructureSet;
 
-            //Structure Circle = StructureSet.Structures.FirstOrDefault(e => e.Id == "Circle");
-            //string filePath = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\contour.csv";
-            //if (Circle != null)
-            //{
-            //    for (int i = 0; i < ScriptContext.Image.ZSize; i++)
-            //    {
-            //        foreach (VVector[] vectors in Circle.GetContoursOnImagePlane(i))
-            //        {
-            //            using (StreamWriter writer = new StreamWriter(filePath))
-            //            {
-            //                writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
-            //            }
-            //        }
-            //    }
-            //}
-
             var MulMarker = StructureSet.Structures.Where(s => s.DicomType == "MARKER").ToList();
             if (MulMarker != null)
             {
@@ -295,11 +287,13 @@ namespace CouchInsert
             FilePathCS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchSurface.csv";
             FilePathCSI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossInterior.csv";
             FilePathCSS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossSurface.csv";
-            FilePathAxis = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\AxisAlign.csv";
+            FilePathBasic = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\BasicInformation.csv";
             CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
             CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
             CrossInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossInterior");
             CrossSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossSurface");
+
+            double AA_Z = MarkerLocationZZ - ZBaseAxis;
 
             VVector start = new VVector(-ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
             VVector stop = new VVector(ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
@@ -332,6 +326,9 @@ namespace CouchInsert
                 MarkerLocationXX = MarkerLocationItem.CenterPoint.x;
                 MarkerLocationYY = MarkerLocationItem.CenterPoint.y;
                 MarkerLocationZZ = MarkerLocationItem.CenterPoint.z;
+                //this is the value of finding z locztion corresponded to z slice
+                //MessageBox.Show(Convert.ToInt32((MarkerLocationZZ-ScriptContext.Image.Origin.z)/ ScriptContext.Image.ZRes).ToString());
+
             }
             else
             {
@@ -346,7 +343,6 @@ namespace CouchInsert
         {
 
             string filePathOuter = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\contour.csv";
-            //string filePathInner = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\contour.csv";
 
             if (!File.Exists(filePathOuter))
             {
@@ -395,14 +391,24 @@ namespace CouchInsert
                 System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
                 return;
             }
+
+            //double BasicY1 = Double.Parse(File.ReadLines(FilePathBasic).Skip(1).Take(1).First());
+            string[] Basiclines = File.ReadAllLines(FilePathBasic);
+            List<string> sourceAxis = Basiclines[1].Trim().Split(',').Select(s => s.Trim()).ToList();
+            HSpace = Double.Parse(sourceAxis[0]);
+            XBaseAxis = Double.Parse(sourceAxis[1]);
+            YBaseAxis = Double.Parse(sourceAxis[2]);
+            ZBaseAxis = Double.Parse(sourceAxis[3]);
+
             if (StructureSet.Structures.Any(s => s.Id == "PQR")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "PQR"));
             Structure PQR = ScriptContext.StructureSet.AddStructure("CONTROL", "PQR");
-            for (int i = 0; i < 10; i++)
+            double SSXAdd = MarkerLocationXX - XBaseAxis - MaxMinDetect(outer1)[0];
+            double SSYAdd = MarkerLocationXX - YBaseAxis - MaxMinDetect(outer1)[1];
+            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z));
+            for (int i = 0; i < SSZAdd; i++)
             {
-                PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+                PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x+ SSXAdd, -(v.y+ SSYAdd), v.z)).ToArray(), i);
             }
-
-            //double Xmin = Math.Min(outer.);
 
             //double[] AddAxis = AxisAlignment(SelectedMarkerPosition, Xmin, Ymin, Zmin);
 
@@ -447,18 +453,12 @@ namespace CouchInsert
                 string[] PathCS = new string[] { dialog.SelectedPath, "CouchSurface.csv" };
                 string[] PathCSI = new string[] { dialog.SelectedPath, "CrossInterior.csv" };
                 string[] PathCSS = new string[] { dialog.SelectedPath, "CrossSurface.csv" };
-                string[] PathAxis = new string[] { dialog.SelectedPath, "AxisAlign.csv" };
+                string[] PathBasic = new string[] { dialog.SelectedPath, "BasicInformation.csv" };
                 FilePathCI = System.IO.Path.Combine(PathCI);
                 FilePathCS = System.IO.Path.Combine(PathCS);
                 FilePathCSI = System.IO.Path.Combine(PathCSI);
                 FilePathCSS = System.IO.Path.Combine(PathCSS);
-                FilePathAxis = System.IO.Path.Combine(PathAxis);
-                string[] filelines = File.ReadAllLines(FilePathAxis);
-                List<string> sourceDel = filelines[1].Trim().Split(',').Select(s => s.Trim()).ToList();
-                HSpace = Double.Parse(sourceDel[0]);
-                XBaseAxis = Double.Parse(sourceDel[1]);
-                YBaseAxis = Double.Parse(sourceDel[2]);
-                ZBaseAxis = Double.Parse(sourceDel[3]);
+                FilePathBasic = System.IO.Path.Combine(PathBasic);
             }
         }
 
@@ -481,12 +481,11 @@ namespace CouchInsert
             if (CouchSurface != null)
             {
                 //VVector contours = CouchSurface.MeshGeometry.Points.Select(e => new VVector(e.x, e.y, e.z));
-
-                for (int i = 0; i < ScriptContext.Image.ZSize; i++)
+                using (StreamWriter writer = new StreamWriter(FilePathCS))
                 {
-                    foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
+                    for (int i = 0; i < ScriptContext.Image.ZSize; i++)
                     {
-                        using (StreamWriter writer = new StreamWriter(FilePathCS))
+                        foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
                         {
                             writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
                         }
@@ -495,11 +494,11 @@ namespace CouchInsert
             }
             if (CrossInterior != null)
             {
-                for (int i = 0; i < ScriptContext.Image.ZSize; i++)
+                using (StreamWriter writer = new StreamWriter(FilePathCSI))
                 {
-                    foreach (VVector[] vectors in CrossInterior.GetContoursOnImagePlane(i))
+                    for (int i = 0; i < ScriptContext.Image.ZSize; i++)
                     {
-                        using (StreamWriter writer = new StreamWriter(FilePathCSI))
+                        foreach (VVector[] vectors in CrossInterior.GetContoursOnImagePlane(i))
                         {
                             writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
                         }
@@ -508,11 +507,11 @@ namespace CouchInsert
             }
             if (CrossSurface != null)
             {
-                for (int i = 0; i < ScriptContext.Image.ZSize; i++)
+                using (StreamWriter writer = new StreamWriter(FilePathCSS))
                 {
-                    foreach (VVector[] vectors in CrossSurface.GetContoursOnImagePlane(i))
+                    for (int i = 0; i < ScriptContext.Image.ZSize; i++)
                     {
-                        using (StreamWriter writer = new StreamWriter(FilePathCSS))
+                        foreach (VVector[] vectors in CrossSurface.GetContoursOnImagePlane(i))
                         {
                             writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
                         }
@@ -574,6 +573,7 @@ namespace CouchInsert
             {
                 var map = new Dictionary<int, string>()
                 {
+                    {0, "0"},
                     {1, "H1"},
                     {2, "H2"},
                     {3, "H3"},
@@ -583,7 +583,7 @@ namespace CouchInsert
                 string output;
                 return map.TryGetValue(Convert.ToInt32(Math.Round(distance)), out output) ? output : null;
             }
-            else return "0";
+            else return "";
 
         }
         public double[] AxisAlignment(string LockBarType, double Xmin, double Ymax, double Zmin)
@@ -604,5 +604,17 @@ namespace CouchInsert
             double[] output;
             return mapAxis.TryGetValue(SelectedMarkerPosition, out output) ? output : null;
         }
-    }
+        public double[] MaxMinDetect(List<VVector> VVectors)
+        {
+            double[] Final = { VVectors[0].x, VVectors[0].y, VVectors[0].z };
+            for (int i = 1; i < VVectors.Count(); i++)
+            {
+                Final[0] = Math.Min(VVectors[i].x, Final[0]); //Always get the maximum value
+                Final[1] = Math.Max(VVectors[i].y, Final[1]);
+                Final[2] = Math.Max(VVectors[i].y, Final[2]);
+            }
+            return Final;
+        }
+
+}
 }
