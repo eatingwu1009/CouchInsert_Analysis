@@ -17,7 +17,8 @@ using System.Windows.Shapes;
 using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using System.Text.RegularExpressions;
-
+using System.Windows.Media;
+using static System.Windows.Forms.LinkLabel;
 
 namespace CouchInsert
 {
@@ -133,6 +134,39 @@ namespace CouchInsert
             {
                 _filePath = value;
                 NotifyPropertyChanged(nameof(FilePath));
+            }
+        }
+
+        private String _filePathpoint;
+        public String FilePathCI_point
+        {
+            get => _filePathpoint;
+            set
+            {
+                _filePathpoint = value;
+                NotifyPropertyChanged(nameof(FilePathCI_point));
+            }
+        }
+
+        private String _filePathCIvector;
+        public String FilePathCI_vector
+        {
+            get => _filePathCIvector;
+            set
+            {
+                _filePathCIvector = value;
+                NotifyPropertyChanged(nameof(FilePathCI_vector));
+            }
+        }
+
+        private String _filePathCITI;
+        public String FilePathCI_TI
+        {
+            get => _filePathCITI;
+            set
+            {
+                _filePathCITI = value;
+                NotifyPropertyChanged(nameof(FilePathCI_TI));
             }
         }
 
@@ -272,7 +306,7 @@ namespace CouchInsert
             StructureSet = scriptContext.StructureSet;
 
             var MulMarker = StructureSet.Structures.Where(s => s.DicomType == "MARKER").ToList();
-            if (MulMarker != null)
+            if (MulMarker.Count > 0)
             {
                 MarkerNames = new List<String>();
                 foreach (Structure Iso in MulMarker)
@@ -281,9 +315,13 @@ namespace CouchInsert
                 }
                 PositionRenew();
             }
-            else System.Windows.MessageBox.Show("There is no marker");
+            else throw new Exception("There is no marker.  At least one marker DICOM type is required.");
 
             FilePathCI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchInterior.csv";
+            FilePathCI_point = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchInterior.csv";
+            FilePathCI_vector = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchInterior.csv";
+            FilePathCI_TI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchInterior.csv";
+
             FilePathCS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CouchSurface.csv";
             FilePathCSI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossInterior.csv";
             FilePathCSS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossSurface.csv";
@@ -341,7 +379,6 @@ namespace CouchInsert
         public ICommand ButtonCommand_AddCouch { get => new Command(AddCouch); }
         private void AddCouch()
         {
-
             string filePathOuter = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\contour.csv";
 
             if (!File.Exists(filePathOuter))
@@ -350,49 +387,71 @@ namespace CouchInsert
                 return;
             }
 
-            string[] filelines = File.ReadAllLines(FilePathCI);
-            Point3DCollection outer = new Point3DCollection();
-            try
+            ScriptContext.Patient.BeginModifications();
+            if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
+            Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
+            //MeshGeometry3D mymesh = new MeshGeometry3D();
+            //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, -1, 0));
+            //XYZ.MeshGeometry.Positions.Add(new Point3D(1, -1, 0));
+            //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, 1, 0));
+            //XYZ.MeshGeometry.Positions.Add(new Point3D(1, 1, 0));
+
+            //XYZ.MeshGeometry.TriangleIndices.Add(0);
+            //XYZ.MeshGeometry.TriangleIndices.Add(1);
+            //XYZ.MeshGeometry.TriangleIndices.Add(2);
+            //XYZ.MeshGeometry.TriangleIndices.Add(2);
+            //XYZ.MeshGeometry.TriangleIndices.Add(3);
+            //XYZ.MeshGeometry.TriangleIndices.Add(0);
+
+            //XYZ.MeshGeometry = GetModel(20, new Vector3D(-1, -1, 0), new Point3D(-1, -1, 0), 10, 150, 250);
+
+            // add Mesh from here
+            //Positions = "-1 -1 0  1 -1 0  -1 1 0  1 1 0";
+            //Normals = "0 0 1  0 0 1  0 0 1  0 0 1";
+            //TextureCoordinates = "0 1  1 1  0 0  1 0   ";
+            //TriangleIndices = "0 1 2  1 3 2";
+
+
+            //string[] filelines = File.ReadAllLines(FilePathCI_point);
+            //try
+            //{
+            //    foreach (string line in filelines)
+            //    {
+            //        string[] splitLine = line.Split(',');
+            //        double x = Double.Parse(splitLine[0].Trim());
+            //        double y = Double.Parse(splitLine[1].Trim());
+            //        double z = Double.Parse(splitLine[2].Trim());
+            //        XYZ.MeshGeometry.Positions.Add(new Point3D(x, y, z));
+            //    }
+            //}
+            //catch
+            //{
+            //    System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
+            //    return;
+            //}
+
+            string[] filelines2 = File.ReadAllLines(FilePathCS);
+            List<VVector> outer1 = new List<VVector>(); 
             {
-                foreach (string line in filelines)
+                foreach (string line in filelines2)
                 {
                     string[] splitLine = line.Split(',');
                     double x = Double.Parse(splitLine[0].Trim());
                     double y = Double.Parse(splitLine[1].Trim());
                     double z = Double.Parse(splitLine[2].Trim());
-                    outer.Add(new Point3D(x, y, z));
-                }
-            }
-            catch
-            {
-                System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
-                return;
-            }
-            ScriptContext.Patient.BeginModifications();
-            if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
-            Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
-            //XYZ.MeshGeometry.Positions = outer;
-
-            string[] filelines1 = File.ReadAllLines(FilePathCSS);
-            List<VVector> outer1 = new List<VVector>();
-            try
-            {
-                foreach (string line1 in filelines1)
-                {
-                    string[] splitLine1 = line1.Split(',');
-                    double x = Double.Parse(splitLine1[0].Trim());
-                    double y = Double.Parse(splitLine1[1].Trim());
-                    double z = Double.Parse(splitLine1[2].Trim());
                     outer1.Add(new VVector(x, y, z));
                 }
             }
-            catch
-            {
-                System.Windows.MessageBox.Show("There was an error when reading the file.  Please make sure that all rows are in the form: number, number, number");
-                return;
-            }
+            //string[] filelines3 = File.ReadAllLines(FilePathCI_TI);
+            //{
+            //    foreach (string line in filelines3)
+            //    {
+            //        Int32 x = Int32.Parse(line.Trim());
+            //        XYZ.MeshGeometry.TriangleIndices.Add(x);
+            //    }
+            //}
 
-            //double BasicY1 = Double.Parse(File.ReadLines(FilePathBasic).Skip(1).Take(1).First());
+            ////double BasicY1 = Double.Parse(File.ReadLines(FilePathBasic).Skip(1).Take(1).First());
             string[] Basiclines = File.ReadAllLines(FilePathBasic);
             List<string> sourceAxis = Basiclines[1].Trim().Split(',').Select(s => s.Trim()).ToList();
             HSpace = Double.Parse(sourceAxis[0]);
@@ -403,11 +462,11 @@ namespace CouchInsert
             if (StructureSet.Structures.Any(s => s.Id == "PQR")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "PQR"));
             Structure PQR = ScriptContext.StructureSet.AddStructure("CONTROL", "PQR");
             double SSXAdd = MarkerLocationXX - XBaseAxis - MaxMinDetect(outer1)[0];
-            double SSYAdd = MarkerLocationXX - YBaseAxis - MaxMinDetect(outer1)[1];
-            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z));
+            double SSYAdd = MarkerLocationYY + YBaseAxis - MaxMinDetect(outer1)[1];
+            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z)/ScriptContext.Image.ZRes);
             for (int i = 0; i < SSZAdd; i++)
             {
-                PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x+ SSXAdd, -(v.y+ SSYAdd), v.z)).ToArray(), i);
+                PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x + SSXAdd, v.y + SSYAdd, v.z)).ToArray(), i);
             }
 
             //double[] AddAxis = AxisAlignment(SelectedMarkerPosition, Xmin, Ymin, Zmin);
@@ -450,11 +509,17 @@ namespace CouchInsert
             {
                 FilePath = dialog.SelectedPath;
                 string[] PathCI = new string[] { dialog.SelectedPath, "CouchInterior.csv" };
+                string[] PathCI_point = new string[] { dialog.SelectedPath, "CouchInterior_point.csv" };
+                string[] PathCI_vector = new string[] { dialog.SelectedPath, "CouchInterior_vector.csv" };
+                string[] PathCI_TI= new string[] { dialog.SelectedPath, "CouchInterior_TI.csv" };
                 string[] PathCS = new string[] { dialog.SelectedPath, "CouchSurface.csv" };
                 string[] PathCSI = new string[] { dialog.SelectedPath, "CrossInterior.csv" };
                 string[] PathCSS = new string[] { dialog.SelectedPath, "CrossSurface.csv" };
                 string[] PathBasic = new string[] { dialog.SelectedPath, "BasicInformation.csv" };
                 FilePathCI = System.IO.Path.Combine(PathCI);
+                FilePathCI_point = System.IO.Path.Combine(PathCI_point);
+                FilePathCI_vector = System.IO.Path.Combine(PathCI_vector);
+                FilePathCI_TI = System.IO.Path.Combine(PathCI_TI);
                 FilePathCS = System.IO.Path.Combine(PathCS);
                 FilePathCSI = System.IO.Path.Combine(PathCSI);
                 FilePathCSS = System.IO.Path.Combine(PathCSS);
@@ -468,15 +533,33 @@ namespace CouchInsert
         {
             if (CouchInterior != null)
             {
-                Point3DCollection vertexes = CouchInterior.MeshGeometry.Positions;
+                Point3DCollection Points = CouchInterior.MeshGeometry.Positions;
+                Vector3DCollection Normals = CouchInterior.MeshGeometry.Normals;
+                PointCollection TextureCoordinate = CouchInterior.MeshGeometry.TextureCoordinates;
+                System.Windows.Media.Int32Collection TriangleIndices = CouchInterior.MeshGeometry.TriangleIndices;
+                using (StreamWriter writer = new StreamWriter(FilePathCI_point))
+                {
+                    foreach (Point3D v in Points) writer.WriteLine(v.X + "," + v.Y + "," + v.Z);
+                    //writer.WriteLine();
+                }
+                using (StreamWriter writer = new StreamWriter(FilePathCI_vector))
+                {
+                    foreach (Vector3D vv in Normals) writer.WriteLine(vv.X + "," + vv.Y + "," + vv.Z);
+
+                }
+                using (StreamWriter writer = new StreamWriter(FilePathCI_TI))
+                {
+                    foreach (Int32 t in TriangleIndices) writer.WriteLine(t);
+                }
                 using (StreamWriter writer = new StreamWriter(FilePathCI))
                 {
-                    foreach (Point3D v in vertexes)
-                    {
-                        writer.Write(v.X + "," + v.Y + "," + v.Z);
-                        writer.WriteLine();
-                     }
+                    foreach (Point p in TextureCoordinate) writer.WriteLine(p.X + "," + p.Y );
                 }
+
+                //Positions = "-1 -1 0  1 -1 0  -1 1 0  1 1 0"
+                //Normals = "0 0 1  0 0 1  0 0 1  0 0 1"
+                //TextureCoordinates = "0 1  1 1  0 0  1 0   "
+                //TriangleIndices = "0 1 2  1 3 2" 
             }
             if (CouchSurface != null)
             {
@@ -487,7 +570,7 @@ namespace CouchInsert
                     {
                         foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
                         {
-                            writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
+                            foreach(VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
                         }
                     }
                 }
@@ -500,7 +583,8 @@ namespace CouchInsert
                     {
                         foreach (VVector[] vectors in CrossInterior.GetContoursOnImagePlane(i))
                         {
-                            writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
+                            foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
+                            //writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
                         }
                     }
                 }
@@ -513,7 +597,7 @@ namespace CouchInsert
                     {
                         foreach (VVector[] vectors in CrossSurface.GetContoursOnImagePlane(i))
                         {
-                            writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
+                            foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
                         }
                     }
                 }
@@ -616,5 +700,52 @@ namespace CouchInsert
             return Final;
         }
 
-}
+        private MeshGeometry3D GetModel(double radius, Vector3D normal, Point3D center, int resolution, double StartAngle, double EndAngle)
+        {
+            var geo = new MeshGeometry3D();
+
+            // Generate the circle in the XZ-plane
+            // Add the center first
+            geo.Positions.Add(new Point3D(0, 0, 0));
+
+            // Iterate from angle 0 to 2*PI
+            double dev = (2 * Math.PI) / resolution;
+            double thik = 0.02;
+            //float spaceangle = StartAngle + 1;
+            if (StartAngle != EndAngle)
+            {
+                for (double i = StartAngle; i < EndAngle; i += dev)
+                {
+                    geo.Positions.Add(new Point3D(radius * Math.Cos(i), 0, -radius * Math.Sin(i)));
+                    geo.Positions.Add(new Point3D((radius - thik) * Math.Cos(i), 0, (-(radius - thik)) * Math.Sin(i)));
+                }
+
+
+                for (int i = 3; i < geo.Positions.Count; i += 1)
+                {
+                    geo.TriangleIndices.Add(i - 3);
+                    geo.TriangleIndices.Add(i - 1);
+                    geo.TriangleIndices.Add(i - 2);
+
+                    geo.TriangleIndices.Add(i - 1);
+                    geo.TriangleIndices.Add(i);
+                    geo.TriangleIndices.Add(i - 2);
+                }
+            }
+
+
+            // Create transforms
+            var trn = new Transform3DGroup();
+            // Up Vector (normal for XZ-plane)
+            var up = new Vector3D(0, 1, 0);
+            // Set normal length to 1
+            normal.Normalize();
+            var axis = Vector3D.CrossProduct(up, normal); // Cross product is rotation axis
+            var angle = Vector3D.AngleBetween(up, normal); // Angle to rotate
+            trn.Children.Add(new RotateTransform3D(new AxisAngleRotation3D(axis, angle)));
+            trn.Children.Add(new TranslateTransform3D(new Vector3D(center.X, center.Y, center.Z)));
+
+            return geo;
+        }
+    }
 }
