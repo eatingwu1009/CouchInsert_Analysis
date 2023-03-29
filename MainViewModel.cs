@@ -682,19 +682,24 @@ namespace CouchInsert
 
         public String PeakDetect(ImageProfile XProfiles)
         {
-            VVector[] Twopoint = new VVector[2];
+            VVector[] Twopoint = new VVector[100];
+            double min = Math.Abs(XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value) * 0.5);
             int a = 0;
-            double min = XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value) * 0.5;
 
-            for (int i = 1; i < XProfile.Count - 1; i++)
+            for (int i = 1; i < XProfile.Count ; i++)
             {
-                if (!Double.IsNaN(XProfile[i].Value) && (XProfile[i].Value > min) && (XProfile[i].Value > XProfile[i - 1].Value) && (XProfile[i].Value > XProfile[i + 1].Value))
+
+                double ii = XProfile[i].Value;
+                double iadd = XProfile[i + 1].Value;
+                double iminus = XProfile[i - 1].Value;
+                if (!Double.IsNaN(ii) && Math.Abs(ii) > Math.Abs(min) && (ii > iadd) && (ii > iminus))
                 {
+                    MessageBox.Show(i.ToString()+","+a);
                     Twopoint[a] = XProfile[i].Position;
                     a++;
                 }
             }
-            if (Twopoint[0].Equals(default(VVector)) || Twopoint[1].Equals(default(VVector))) return XProfile[50].Value.ToString() + "," + XProfile[50].Position.x.ToString();
+            if (Twopoint[0].Equals(default(VVector)) || Twopoint[1].Equals(default(VVector))) return "";
             double distance = VVector.Distance(Twopoint[0], Twopoint[1]);
             if (Math.Round(distance) > 0.5)
             {
