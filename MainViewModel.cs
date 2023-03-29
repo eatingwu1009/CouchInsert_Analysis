@@ -240,7 +240,7 @@ namespace CouchInsert
         public StructureSet StructureSet { get; }
         public VVector SIU { get; }
         public ImageProfile XProfile { get; }
-       
+
         private Structure _couchInterior;
         public Structure CouchInterior
         {
@@ -335,9 +335,9 @@ namespace CouchInsert
 
             VVector start = new VVector(-ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
             VVector stop = new VVector(ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
-            //double[] preallocatedBuffer = null;
-            //XProfile = scriptContext.Image.GetImageProfile(start, stop, preallocatedBuffer);
-            //MessageBox.Show(PeakDetect(XProfile));
+            double[] preallocatedBuffer = new double[100];
+            XProfile = scriptContext.Image.GetImageProfile(start, stop, preallocatedBuffer);
+            MessageBox.Show(PeakDetect(XProfile));
 
             MarkerPositions = new List<String>();
             MarkerPositions.Add("H5");
@@ -376,6 +376,49 @@ namespace CouchInsert
             }
         }
 
+        public static void CreateSphere(MeshGeometry3D mesh, double radius, int subdivisions)
+        {
+            if (mesh.Positions == null) mesh.Positions = new Point3DCollection();
+            if (mesh.TriangleIndices == null) mesh.TriangleIndices = new Int32Collection();
+            mesh.Positions.Clear();
+            mesh.TriangleIndices.Clear();
+
+            for (int i = 0; i <= subdivisions; i++)
+            {
+                double v = i / (double)subdivisions;
+                double phi = v * Math.PI;
+
+                for (int j = 0; j <= subdivisions; j++)
+                {
+                    double u = j / (double)subdivisions;
+                    double theta = u * 2 * Math.PI;
+
+                    double x = Math.Cos(theta) * Math.Sin(phi);
+                    double y = Math.Cos(phi);
+                    double z = Math.Sin(theta) * Math.Sin(phi);
+
+                    mesh.Positions.Add(new Point3D(radius * x, radius * y, radius * z));
+                }
+            }
+
+            for (int i = 0; i < subdivisions; i++)
+            {
+                for (int j = 0; j < subdivisions; j++)
+                {
+                    int index1 = i * (subdivisions + 1) + j;
+                    int index2 = index1 + subdivisions + 1;
+
+                    mesh.TriangleIndices.Add(index1);
+                    mesh.TriangleIndices.Add(index2);
+                    mesh.TriangleIndices.Add(index1 + 1);
+
+                    mesh.TriangleIndices.Add(index1 + 1);
+                    mesh.TriangleIndices.Add(index2);
+                    mesh.TriangleIndices.Add(index2 + 1);
+                }
+            }
+        }
+
         public ICommand ButtonCommand_AddCouch { get => new Command(AddCouch); }
         private void AddCouch()
         {
@@ -388,9 +431,10 @@ namespace CouchInsert
             }
 
             ScriptContext.Patient.BeginModifications();
-            if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
-            Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
-            //MeshGeometry3D mymesh = new MeshGeometry3D();
+            //if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
+            //Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
+            Structure XYZ = StructureSet.Structures.FirstOrDefault(s => s.Id == "XYZ");
+            CreateSphere(XYZ.MeshGeometry, 10.0, 20);
             //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, -1, 0));
             //XYZ.MeshGeometry.Positions.Add(new Point3D(1, -1, 0));
             //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, 1, 0));
@@ -431,7 +475,7 @@ namespace CouchInsert
             //}
 
             string[] filelines2 = File.ReadAllLines(FilePathCS);
-            List<VVector> outer1 = new List<VVector>(); 
+            List<VVector> outer1 = new List<VVector>();
             {
                 foreach (string line in filelines2)
                 {
@@ -463,7 +507,7 @@ namespace CouchInsert
             Structure PQR = ScriptContext.StructureSet.AddStructure("CONTROL", "PQR");
             double SSXAdd = MarkerLocationXX - XBaseAxis - MaxMinDetect(outer1)[0];
             double SSYAdd = MarkerLocationYY + YBaseAxis - MaxMinDetect(outer1)[1];
-            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z)/ScriptContext.Image.ZRes);
+            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
             for (int i = 0; i < SSZAdd; i++)
             {
                 PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x + SSXAdd, v.y + SSYAdd, v.z)).ToArray(), i);
@@ -511,7 +555,7 @@ namespace CouchInsert
                 string[] PathCI = new string[] { dialog.SelectedPath, "CouchInterior.csv" };
                 string[] PathCI_point = new string[] { dialog.SelectedPath, "CouchInterior_point.csv" };
                 string[] PathCI_vector = new string[] { dialog.SelectedPath, "CouchInterior_vector.csv" };
-                string[] PathCI_TI= new string[] { dialog.SelectedPath, "CouchInterior_TI.csv" };
+                string[] PathCI_TI = new string[] { dialog.SelectedPath, "CouchInterior_TI.csv" };
                 string[] PathCS = new string[] { dialog.SelectedPath, "CouchSurface.csv" };
                 string[] PathCSI = new string[] { dialog.SelectedPath, "CrossInterior.csv" };
                 string[] PathCSS = new string[] { dialog.SelectedPath, "CrossSurface.csv" };
@@ -553,7 +597,7 @@ namespace CouchInsert
                 }
                 using (StreamWriter writer = new StreamWriter(FilePathCI))
                 {
-                    foreach (Point p in TextureCoordinate) writer.WriteLine(p.X + "," + p.Y );
+                    foreach (Point p in TextureCoordinate) writer.WriteLine(p.X + "," + p.Y);
                 }
 
                 //Positions = "-1 -1 0  1 -1 0  -1 1 0  1 1 0"
@@ -570,7 +614,7 @@ namespace CouchInsert
                     {
                         foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
                         {
-                            foreach(VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
+                            foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
                         }
                     }
                 }
@@ -638,20 +682,19 @@ namespace CouchInsert
 
         public String PeakDetect(ImageProfile XProfiles)
         {
-            VVector[] Twopoint = null;
+            VVector[] Twopoint = new VVector[2];
             int a = 0;
+            double min = XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value) * 0.5;
 
-            for (int i = 0; i < XProfile.Count; i++)
+            for (int i = 1; i < XProfile.Count - 1; i++)
             {
-                if (XProfile[i].Value > (XProfiles.Max().Value * 0.5))
+                if (!Double.IsNaN(XProfile[i].Value) && (XProfile[i].Value > min) && (XProfile[i].Value > XProfile[i - 1].Value) && (XProfile[i].Value > XProfile[i + 1].Value))
                 {
-                    if (XProfile[i].Value > XProfile[i - 1].Value && XProfile[i].Value > XProfile[i - 1].Value)
-                    {
-                        Twopoint[a] = XProfile[i].Position;
-                        a++;
-                    }
+                    Twopoint[a] = XProfile[i].Position;
+                    a++;
                 }
             }
+            if (Twopoint[0].Equals(default(VVector)) || Twopoint[1].Equals(default(VVector))) return XProfile[50].Value.ToString() + "," + XProfile[50].Position.x.ToString();
             double distance = VVector.Distance(Twopoint[0], Twopoint[1]);
             if (Math.Round(distance) > 0.5)
             {
