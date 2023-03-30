@@ -75,7 +75,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Label Grid.Column="0" Content="Position : " Foreground="Maroon"/>
-            <ComboBox Grid.Column="1" ItemsSource="{Binding MarkerPositions}" SelectedValue="{Binding SelectedMarkerPosition}"/>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding MarkerPositions}" SelectedValue="{Binding SelectedMarkerPosition}" SelectionChanged="ComboBox_SelectionChanged"/>
             <Button Grid.Column="2" Content="APPLY⏳" Command="{Binding ButtonCommand_AddCouch}" Cursor="Hand"/>
         </Grid>
         <Label Content="STEP3 : Modulate Your Position" Foreground="White" FontWeight="Bold" FontSize="16"/>

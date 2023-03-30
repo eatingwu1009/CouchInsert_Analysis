@@ -333,11 +333,11 @@ namespace CouchInsert
 
             double AA_Z = MarkerLocationZZ - ZBaseAxis;
 
-            VVector start = new VVector(-ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
-            VVector stop = new VVector(ScriptContext.Image.XSize, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
-            double[] preallocatedBuffer = new double[100];
+            VVector start = new VVector(MarkerLocationItem.CenterPoint.x - 60, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
+            VVector stop = new VVector(MarkerLocationItem.CenterPoint.x + 5, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
+            double[] preallocatedBuffer = new double[1000];
             XProfile = scriptContext.Image.GetImageProfile(start, stop, preallocatedBuffer);
-            MessageBox.Show(PeakDetect(XProfile));
+            SelectedMarkerPosition = PeakDetect(XProfile);
 
             MarkerPositions = new List<String>();
             MarkerPositions.Add("H5");
@@ -682,41 +682,43 @@ namespace CouchInsert
 
         public String PeakDetect(ImageProfile XProfiles)
         {
-            VVector[] Twopoint = new VVector[100];
-            double min = Math.Abs(XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value) * 0.5);
-            int a = 0;
+            List<VVector> Twopoint = new List<VVector>();
+            double HalfTrend = (XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value)) * 2;
 
-            for (int i = 1; i < XProfile.Count ; i++)
+            for (int i = 1; i < XProfile.Count -1 ; i++)
             {
 
                 double ii = XProfile[i].Value;
                 double iadd = XProfile[i + 1].Value;
                 double iminus = XProfile[i - 1].Value;
-                if (!Double.IsNaN(ii) && Math.Abs(ii) > Math.Abs(min) && (ii > iadd) && (ii > iminus))
+                if (!Double.IsNaN(ii) && ii > HalfTrend && (ii > iadd) && (ii > iminus))
                 {
-                    MessageBox.Show(i.ToString()+","+a);
-                    Twopoint[a] = XProfile[i].Position;
-                    a++;
+                    Twopoint.Add(XProfile[i].Position);
                 }
             }
-            if (Twopoint[0].Equals(default(VVector)) || Twopoint[1].Equals(default(VVector))) return "";
-            double distance = VVector.Distance(Twopoint[0], Twopoint[1]);
-            if (Math.Round(distance) > 0.5)
+            if (Twopoint.Count > 1)
             {
-                var map = new Dictionary<int, string>()
+                double distance = VVector.Distance(Twopoint[0], Twopoint[1]);
+                if (Math.Round(distance) > 5)// length unit by mm
                 {
-                    {0, "0"},
-                    {1, "H1"},
-                    {2, "H2"},
-                    {3, "H3"},
-                    {4, "H4"},
-                    {5, "H5"},
+                    var map = new Dictionary<int, string>()
+                {
+                    {10, "H1"},
+                    {20, "H2"},
+                    {30, "H3"},
+                    {40, "H4"},
+                    {50, "H5"},
                 };
-                string output;
-                return map.TryGetValue(Convert.ToInt32(Math.Round(distance)), out output) ? output : null;
+                    string output;
+                    return map.TryGetValue(Convert.ToInt32(Math.Round(distance)), out output) ? output : null;
+                }
+                else return "";                
+            }
+            else if (Twopoint.Count == 1)
+            {
+                return "0";
             }
             else return "";
-
         }
         public double[] AxisAlignment(string LockBarType, double Xmin, double Ymax, double Zmin)
         {
