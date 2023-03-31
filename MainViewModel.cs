@@ -115,6 +115,28 @@ namespace CouchInsert
             }
         }
 
+        private VVector _start;
+        public VVector Start
+        {
+            get => _start;
+            set
+            {
+                _start = value;
+                NotifyPropertyChanged(nameof(Start));
+            }
+        }
+
+        private VVector _stop;
+        public VVector Stop
+        {
+            get => _stop;
+            set
+            {
+                _stop = value;
+                NotifyPropertyChanged(nameof(Stop));
+            }
+        }
+
         private Structure _markerLocationItem;
         public Structure MarkerLocationItem
         {
@@ -239,7 +261,39 @@ namespace CouchInsert
         public ScriptContext ScriptContext { get; }
         public StructureSet StructureSet { get; }
         public VVector SIU { get; }
-        public ImageProfile XProfile { get; }
+
+        private ImageProfile _xProfile;
+        public ImageProfile XProfile
+        {
+            get => _xProfile;
+            set
+            {
+                _xProfile = value;
+                NotifyPropertyChanged(nameof(XProfile));
+            }
+        }
+
+        private double[] _preallocatedBuffer;
+        public double[] PreallocatedBuffer
+        {
+            get => _preallocatedBuffer;
+            set
+            {
+                _preallocatedBuffer = value;
+                NotifyPropertyChanged(nameof(PreallocatedBuffer));
+            }
+        }
+
+        private Structure _xyz;
+        public Structure XYZ
+        {
+            get => _xyz;
+            set
+            {
+                _xyz = value;
+                NotifyPropertyChanged(nameof(XYZ));
+            }
+        }
 
         private Structure _couchInterior;
         public Structure CouchInterior
@@ -332,12 +386,11 @@ namespace CouchInsert
             CrossSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossSurface");
 
             double AA_Z = MarkerLocationZZ - ZBaseAxis;
-
-            VVector start = new VVector(MarkerLocationItem.CenterPoint.x - 60, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
-            VVector stop = new VVector(MarkerLocationItem.CenterPoint.x + 5, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
-            double[] preallocatedBuffer = new double[1000];
-            XProfile = scriptContext.Image.GetImageProfile(start, stop, preallocatedBuffer);
-            SelectedMarkerPosition = PeakDetect(XProfile);
+            ScriptContext.Patient.BeginModifications();
+            XYZ = StructureSet.Structures.FirstOrDefault(s => s.Id == "XYZ");
+            XYZ.MeshGeometry.Positions.Clear();
+            XYZ.MeshGeometry.TriangleIndices.Clear();
+            //CreateSphere(XYZ.MeshGeometry, 10.0, 20);
 
             MarkerPositions = new List<String>();
             MarkerPositions.Add("H5");
@@ -346,7 +399,6 @@ namespace CouchInsert
             MarkerPositions.Add("H2");
             MarkerPositions.Add("H1");
             MarkerPositions.Add("0");
-
         }
 
         public ICommand PositionRenewCommand { get => new Command(PositionRenew); }
@@ -366,56 +418,17 @@ namespace CouchInsert
                 MarkerLocationZZ = MarkerLocationItem.CenterPoint.z;
                 //this is the value of finding z locztion corresponded to z slice
                 //MessageBox.Show(Convert.ToInt32((MarkerLocationZZ-ScriptContext.Image.Origin.z)/ ScriptContext.Image.ZRes).ToString());
-
+                Start = new VVector(MarkerLocationItem.CenterPoint.x - 60, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
+                Stop = new VVector(MarkerLocationItem.CenterPoint.x + 5, MarkerLocationItem.CenterPoint.y, MarkerLocationItem.CenterPoint.z);
+                PreallocatedBuffer = new double[1000];
+                XProfile = ScriptContext.Image.GetImageProfile(Start, Stop, PreallocatedBuffer);
+                SelectedMarkerPosition = PeakDetect(XProfile);
             }
             else
             {
                 MarkerLocationX = null;
                 MarkerLocationY = null;
                 MarkerLocationZ = null;
-            }
-        }
-
-        public static void CreateSphere(MeshGeometry3D mesh, double radius, int subdivisions)
-        {
-            if (mesh.Positions == null) mesh.Positions = new Point3DCollection();
-            if (mesh.TriangleIndices == null) mesh.TriangleIndices = new Int32Collection();
-            mesh.Positions.Clear();
-            mesh.TriangleIndices.Clear();
-
-            for (int i = 0; i <= subdivisions; i++)
-            {
-                double v = i / (double)subdivisions;
-                double phi = v * Math.PI;
-
-                for (int j = 0; j <= subdivisions; j++)
-                {
-                    double u = j / (double)subdivisions;
-                    double theta = u * 2 * Math.PI;
-
-                    double x = Math.Cos(theta) * Math.Sin(phi);
-                    double y = Math.Cos(phi);
-                    double z = Math.Sin(theta) * Math.Sin(phi);
-
-                    mesh.Positions.Add(new Point3D(radius * x, radius * y, radius * z));
-                }
-            }
-
-            for (int i = 0; i < subdivisions; i++)
-            {
-                for (int j = 0; j < subdivisions; j++)
-                {
-                    int index1 = i * (subdivisions + 1) + j;
-                    int index2 = index1 + subdivisions + 1;
-
-                    mesh.TriangleIndices.Add(index1);
-                    mesh.TriangleIndices.Add(index2);
-                    mesh.TriangleIndices.Add(index1 + 1);
-
-                    mesh.TriangleIndices.Add(index1 + 1);
-                    mesh.TriangleIndices.Add(index2);
-                    mesh.TriangleIndices.Add(index2 + 1);
-                }
             }
         }
 
@@ -429,12 +442,8 @@ namespace CouchInsert
                 System.Windows.MessageBox.Show($"No file exists at path {filePathOuter}");
                 return;
             }
-
-            ScriptContext.Patient.BeginModifications();
             //if (StructureSet.Structures.Any(s => s.Id == "XYZ")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "XYZ"));
             //Structure XYZ = ScriptContext.StructureSet.AddStructure("CONTROL", "XYZ");
-            Structure XYZ = StructureSet.Structures.FirstOrDefault(s => s.Id == "XYZ");
-            CreateSphere(XYZ.MeshGeometry, 10.0, 20);
             //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, -1, 0));
             //XYZ.MeshGeometry.Positions.Add(new Point3D(1, -1, 0));
             //XYZ.MeshGeometry.Positions.Add(new Point3D(-1, 1, 0));
@@ -541,7 +550,49 @@ namespace CouchInsert
             //}
             ////MessageBox.Show(ScriptContext.IonPlanSetup.PatientSupportDevice.ReadXml(XmlReader)) ;
             ////MessageBox.Show("ButtonCommand_AddCouch");
+        }
 
+        public static void CreateSphere(MeshGeometry3D mesh, double radius, int subdivisions)
+        {
+            if (mesh.Positions == null) mesh.Positions = new Point3DCollection();
+            if (mesh.TriangleIndices == null) mesh.TriangleIndices = new Int32Collection();
+            mesh.Positions.Clear();
+            mesh.TriangleIndices.Clear();
+
+            for (int i = 0; i <= subdivisions; i++)
+            {
+                double v = i / (double)subdivisions;
+                double phi = v * Math.PI;
+
+                for (int j = 0; j <= subdivisions; j++)
+                {
+                    double u = j / (double)subdivisions;
+                    double theta = u * 2 * Math.PI;
+
+                    double x = Math.Cos(theta) * Math.Sin(phi);
+                    double y = Math.Cos(phi);
+                    double z = Math.Sin(theta) * Math.Sin(phi);
+
+                    mesh.Positions.Add(new Point3D(radius * x, radius * y, radius * z));
+                }
+            }
+
+            for (int i = 0; i < subdivisions; i++)
+            {
+                for (int j = 0; j < subdivisions; j++)
+                {
+                    int index1 = i * (subdivisions + 1) + j;
+                    int index2 = index1 + subdivisions + 1;
+
+                    mesh.TriangleIndices.Add(index1);
+                    mesh.TriangleIndices.Add(index2);
+                    mesh.TriangleIndices.Add(index1 + 1);
+
+                    mesh.TriangleIndices.Add(index1 + 1);
+                    mesh.TriangleIndices.Add(index2);
+                    mesh.TriangleIndices.Add(index2 + 1);
+                }
+            }
         }
         public ICommand ButtonCommand_FilePath { get => new Command(GetFilePath); }
         private void GetFilePath()
@@ -680,10 +731,10 @@ namespace CouchInsert
             return vvectors.ToArray();
         }
 
-        public String PeakDetect(ImageProfile XProfiles)
+        public String PeakDetect(ImageProfile XProfile)
         {
             List<VVector> Twopoint = new List<VVector>();
-            double HalfTrend = (XProfiles.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value)) * 2;
+            double HalfTrend = (XProfile.Where(p => !Double.IsNaN(p.Value)).Max(p => p.Value)) * 2;
 
             for (int i = 1; i < XProfile.Count -1 ; i++)
             {
