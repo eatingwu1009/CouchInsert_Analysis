@@ -473,27 +473,6 @@ namespace CouchInsert
             //    return;
             //}
 
-            string[] filelines2 = File.ReadAllLines(FilePathCS);
-            List<VVector> outer1 = new List<VVector>();
-            {
-                foreach (string line in filelines2)
-                {
-                    string[] splitLine = line.Split(',');
-                    double x = Double.Parse(splitLine[0].Trim());
-                    double y = Double.Parse(splitLine[1].Trim());
-                    double z = Double.Parse(splitLine[2].Trim());
-                    outer1.Add(new VVector(x, y, z));
-                }
-            }
-            //string[] filelines3 = File.ReadAllLines(FilePathCI_TI);
-            //{
-            //    foreach (string line in filelines3)
-            //    {
-            //        Int32 x = Int32.Parse(line.Trim());
-            //        XYZ.MeshGeometry.TriangleIndices.Add(x);
-            //    }
-            //}
-
             string[] Basiclines = File.ReadAllLines(FilePathBasic);
             List<string> sourceAxis = Basiclines[1].Trim().Split(',').Select(s => s.Trim()).ToList();
             HSpace = Double.Parse(sourceAxis[0]);
@@ -505,54 +484,75 @@ namespace CouchInsert
             CSSHU = Double.Parse(sourceAxis[6]);
             CSIHU = Double.Parse(sourceAxis[7]);
 
-            if (StructureSet.Structures.Any(s => s.Id == "PQR")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "PQR"));
-            Structure PQR = ScriptContext.StructureSet.AddStructure("CONTROL", "PQR");
-            //AxisAlignment(string LockBarType, double Xmin, double Ymax, double Zmin)
-            List<VVector> newouter = new List<VVector>();
-            double SSXAdd = MarkerLocationXX - XBaseAxis - MaxMinDetect(outer1)[0];
-            double SSYAdd = MarkerLocationYY + YBaseAxis - MaxMinDetect(outer1)[1];
-            double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
-            foreach(VVector vec in outer1)
+            string[] TempFilelines = File.ReadAllLines(FilePathCS);
+            List<VVector> CSVVector = new List<VVector>();
             {
-                VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(outer1)[0], MaxMinDetect(outer1)[1], MaxMinDetect(outer1)[2]);
-                newouter.Add(new VVector(vv.x, vv.y, vv.z));
-                //newouter.Max(p => p.z)
+                foreach (string line in TempFilelines)
+                {
+                    string[] splitLine = line.Split(',');
+                    double x = Double.Parse(splitLine[0].Trim());
+                    double y = Double.Parse(splitLine[1].Trim());
+                    double z = Double.Parse(splitLine[2].Trim());
+                    CSVVector.Add(new VVector(x, y, z));
+                }
             }
-            for (int i = 0; i < SSZAdd; i++)
+            //string[] filelines3 = File.ReadAllLines(FilePathCI_TI);
+            //{
+            //    foreach (string line in filelines3)
+            //    {
+            //        Int32 x = Int32.Parse(line.Trim());
+            //        XYZ.MeshGeometry.TriangleIndices.Add(x);
+            //    }
+            //}
+
+            if (StructureSet.Structures.Any(s => s.Id == "CouchSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CouchSurface"));
+            Structure CouchSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CouchSurface");
+
+            List<VVector> NewVVector = new List<VVector>();
+            foreach (VVector vec in CSVVector)
             {
-                PQR.AddContourOnImagePlane(newouter.Select(v => new VVector(v.x , v.y, v.z)).ToArray(), i);
+                VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
+                NewVVector.Add(new VVector(vv.x, vv.y, vv.z));
+
             }
-            PQR.SetAssignedHU(CSSHU);
+            for (int i = Convert.ToInt32(NewVVector.Min(p => p.z)); i < NewVVector.Max(p => p.z); i ++)
+            {
+                CouchSurface.AddContourOnImagePlane(NewVVector.Where(a => a.z.Equals(Convert.ToDouble(i))).ToArray(), i);
+            }
+            CouchSurface.SetAssignedHU(CSHU);
 
-            //double[] AddAxis = AxisAlignment(SelectedMarkerPosition, Xmin, Ymin, Zmin);
-
-
-            //Structure ABC = StructureSet.Structures.FirstOrDefault(e => e.Id == "ABC");
-            //Structure DEF = StructureSet.Structures.FirstOrDefault(e => e.Id == "DEF");
-            //ABC.SegmentVolume = ABC.SegmentVolume.Sub(DEF.SegmentVolume);
-
-
-            //Structure CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
-            //Structure CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
-            //PatientOrientation orientation = ScriptContext.Image.ImagingOrientation;
-            ////IReadOnlyList<Structure> couchStructureList = new List<Structure>();
-            //bool imageResized = true;
-            //string errorCouch = "error";
-            //ScriptContext.Patient.BeginModifications();
-            //if (CouchInterior == null && CouchSurface == null)
+            //Array.Clear(Tempfilelines,0, Tempfilelines.Length);
+            //CSVVector.Clear();
+            //Tempfilelines = File.ReadAllLines(FilePathCSS);
+            //CSVVector = new List<VVector>();
             //{
-            //    //bool IsAddCouch = StructureSet.AddCouchStructures("Exact IGRT Couch, medium", orientation, 0, 0, -300, -1000, null, out addedStructures, out imageResized, out error);
-            //    StructureSet.AddCouchStructures("Exact IGRT Couch, medium", orientation, RailPosition.In, RailPosition.In, null, null, null, out IReadOnlyList<Structure> couchStructureList, out imageResized, out errorCouch);
+            //    foreach (string line in Tempfilelines)
+            //    {
+            //        string[] splitLine = line.Split(',');
+            //        double x = Double.Parse(splitLine[0].Trim());
+            //        double y = Double.Parse(splitLine[1].Trim());
+            //        double z = Double.Parse(splitLine[2].Trim());
+            //        CSVVector.Add(new VVector(x, y, z));
+            //    }
             //}
-            //else
+            //TempFilelines.Clear();
+            //if (StructureSet.Structures.Any(s => s.Id == "CrossSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossSurface"));
+            //Structure CrossSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossSurface");
+
+            //foreach (VVector vec in CSVVector)
             //{
-            //    ScriptContext.StructureSet.RemoveStructure(CouchInterior);
-            //    ScriptContext.StructureSet.RemoveStructure(CouchSurface);
-            //    StructureSet.AddCouchStructures("Exact IGRT Couch, medium", PatientOrientation.HeadFirstSupine, RailPosition.In, RailPosition.In, null, null, null, out IReadOnlyList<Structure> couchStructureList, out imageResized, out errorCouch);
+            //    VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
+            //    TempFilelines.Add(new VVector(vv.x, vv.y, vv.z));
             //}
-            ////MessageBox.Show(ScriptContext.IonPlanSetup.PatientSupportDevice.ReadXml(XmlReader)) ;
-            ////MessageBox.Show("ButtonCommand_AddCouch");
+            //for (int i = 0; i < TempFilelines.Max(p => p.z); i++)
+            //{
+            //    CrossSurface.AddContourOnImagePlane(TempFilelines.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+            //}
+            //CrossSurface.SetAssignedHU(CSSHU);
+
         }
+
+
 
         public static void CreateSphere(MeshGeometry3D mesh, double radius, int subdivisions)
         {
@@ -631,18 +631,28 @@ namespace CouchInsert
             {
                 if (CouchInterior != null)
                 {
-                    Point3DCollection Points = CouchInterior.MeshGeometry.Positions;
-                    Vector3DCollection Normals = CouchInterior.MeshGeometry.Normals;
-                    PointCollection TextureCoordinate = CouchInterior.MeshGeometry.TextureCoordinates;
-                    System.Windows.Media.Int32Collection TriangleIndices = CouchInterior.MeshGeometry.TriangleIndices;
-                    using (StreamWriter writer = new StreamWriter(FilePathCI_point))
+                    //Point3DCollection Points = CouchInterior.MeshGeometry.Positions;
+                    //Vector3DCollection Normals = CouchInterior.MeshGeometry.Normals;
+                    //PointCollection TextureCoordinate = CouchInterior.MeshGeometry.TextureCoordinates;
+                    //System.Windows.Media.Int32Collection TriangleIndices = CouchInterior.MeshGeometry.TriangleIndices;
+                    //using (StreamWriter writer = new StreamWriter(FilePathCI_point))
+                    //{
+                    //    foreach (Point3D v in Points) writer.WriteLine(v.X + "," + v.Y + "," + v.Z);
+                    //    //writer.WriteLine();
+                    //}
+                    //using (StreamWriter writer = new StreamWriter(FilePathCI_TI))
+                    //{
+                    //    foreach (Int32 t in TriangleIndices) writer.WriteLine(t);
+                    //}
+                    using (StreamWriter writer = new StreamWriter(FilePathCI))
                     {
-                        foreach (Point3D v in Points) writer.WriteLine(v.X + "," + v.Y + "," + v.Z);
-                        //writer.WriteLine();
-                    }
-                    using (StreamWriter writer = new StreamWriter(FilePathCI_TI))
-                    {
-                        foreach (Int32 t in TriangleIndices) writer.WriteLine(t);
+                        for (int i = 0; i < ScriptContext.Image.ZSize; i++)
+                        {
+                            foreach (VVector[] vectors in CouchInterior.GetContoursOnImagePlane(i))
+                            {
+                                foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
+                            }
+                        }
                     }
 
                 }
@@ -651,11 +661,13 @@ namespace CouchInsert
                     //VVector contours = CouchSurface.MeshGeometry.Points.Select(e => new VVector(e.x, e.y, e.z));
                     using (StreamWriter writer = new StreamWriter(FilePathCS))
                     {
-                        for (int i = 0; i < ScriptContext.Image.ZSize; i++)
                         {
-                            foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
+                            for (int i = 0; i < ScriptContext.Image.ZSize; i++)
                             {
-                                foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
+                                foreach (VVector[] vectors in CouchSurface.GetContoursOnImagePlane(i))
+                                {
+                                    foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
+                                }
                             }
                         }
                     }
@@ -669,7 +681,6 @@ namespace CouchInsert
                             foreach (VVector[] vectors in CrossInterior.GetContoursOnImagePlane(i))
                             {
                                 foreach (VVector vector in vectors) writer.WriteLine(vector.x + "," + vector.y + "," + vector.z);
-                                //writer.WriteLine(String.Join(",", vectors.Select(v => $"{v.x}, {v.y}, {v.z}\n ")));
                             }
                         }
                     }
@@ -766,26 +777,19 @@ namespace CouchInsert
             //The value of YAxis is opposite
             double X = MarkerLocationXX - XBaseAxis - Xmin;
             double Y = MarkerLocationYY + YBaseAxis - Ymax;
-            double Z = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis -Zmin- ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
+            double Z = MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z -Zmin;
+            //double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
             var mapAxis = new Dictionary<string, VVector>()
             {
-                {"0",   new VVector ( Original.x + X, Original.y + Y, Original.z + Z - 3*HSpace )},
-                {"H1",  new VVector ( Original.x + X, Original.y + Y, Original.z + Z - 2*HSpace )},
-                {"H2",  new VVector ( Original.x + X, Original.y + Y, Original.z + Z - HSpace )},
-                {"H3",  new VVector ( Original.x + X, Original.y + Y, Original.z + Z )},
-                {"H4",  new VVector ( Original.x + X, Original.y + Y, Original.z + Z+ HSpace)},
-                {"H5",  new VVector ( Original.x + X, Original.y + Y, Original.z + Z+ 2*HSpace)},
+                {"H5",   new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z  - 2 * HSpace)/ ScriptContext.Image.ZRes))},
+                {"H4",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z - HSpace)/ ScriptContext.Image.ZRes))},
+                {"H3",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z ) / ScriptContext.Image.ZRes))},
+                {"H2",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z  + HSpace)/ ScriptContext.Image.ZRes))},
+                {"H1",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z  + 2 * HSpace)/ ScriptContext.Image.ZRes))},
+                {"0",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z + 3 * HSpace)/ ScriptContext.Image.ZRes))},
             };
             VVector output;
-            return mapAxis.TryGetValue(SelectedMarkerPosition, out output) ? output : new VVector(0,0,0);
-
-            //double SSXAdd = MarkerLocationXX - XBaseAxis - MaxMinDetect(outer1)[0];
-            //double SSYAdd = MarkerLocationYY + YBaseAxis - MaxMinDetect(outer1)[1];
-            //double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
-            //for (int i = 0; i < SSZAdd; i++)
-            //{
-            //    PQR.AddContourOnImagePlane(outer1.Select(v => new VVector(v.x + SSXAdd, v.y + SSYAdd, v.z)).ToArray(), i);
-            //}
+            return mapAxis.TryGetValue(LockBarType, out output) ? output : new VVector(0,0,0);
         }
         public double[] MaxMinDetect(List<VVector> VVectors)
         {
@@ -794,7 +798,7 @@ namespace CouchInsert
             {
                 Final[0] = Math.Min(VVectors[i].x, Final[0]); //Always get the maximum value
                 Final[1] = Math.Max(VVectors[i].y, Final[1]);
-                Final[2] = Math.Min(VVectors[i].y, Final[2]);
+                Final[2] = Math.Min(VVectors[i].z, Final[2]);
             }
             return Final;
         }
