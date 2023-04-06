@@ -20,6 +20,8 @@ using System.Text.RegularExpressions;
 using System.Windows.Media;
 using static System.Windows.Forms.LinkLabel;
 using System.Windows.Forms;
+using System.Diagnostics.Eventing.Reader;
+using System.Windows.Documents;
 
 namespace CouchInsert
 {
@@ -357,6 +359,7 @@ namespace CouchInsert
             MarkerNames.Add("BB");
             MarkerNames.Add("CC");
         }
+        //This Code is based on the Model slice thickness = 1mm and the minimun interpolate resolution is 0.5mm
 
         public MainViewModel(ScriptContext scriptContext)
         {
@@ -385,8 +388,8 @@ namespace CouchInsert
             FilePathCSI = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossInterior.csv";
             FilePathCSS = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\CrossSurface.csv";
             FilePathBasic = @"\\Vmstbox161\va_data$\ProgramData\Vision\PublishedScripts\BasicInformation.csv";
-            CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
-            CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
+            //CouchInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchInterior");
+            //CouchSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CouchSurface");
             CrossInterior = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossInterior");
             CrossSurface = StructureSet.Structures.FirstOrDefault(e => e.Id == "CrossSurface");
 
@@ -404,6 +407,21 @@ namespace CouchInsert
             MarkerPositions.Add("H2");
             MarkerPositions.Add("H1");
             MarkerPositions.Add("0");
+
+            PatientOrientation orientation = ScriptContext.Image.ImagingOrientation;
+            bool imageResized = true;
+            string errorCouch = "error";
+            ScriptContext.Patient.BeginModifications();
+            if (StructureSet.CanAddCouchStructures(out errorCouch) == true)
+            {
+                StructureSet.AddCouchStructures("Exact IGRT Couch, medium", orientation, RailPosition.In, RailPosition.In, null, null, null, out IReadOnlyList<Structure> couchStructureList, out imageResized, out errorCouch);
+            }
+            else
+            {
+                ScriptContext.StructureSet.RemoveStructure(CouchInterior);
+                ScriptContext.StructureSet.RemoveStructure(CouchSurface);
+                StructureSet.AddCouchStructures("Exact IGRT Couch, medium", PatientOrientation.HeadFirstSupine, RailPosition.In, RailPosition.In, null, null, null, out IReadOnlyList<Structure> couchStructureList, out imageResized, out errorCouch);
+            }
         }
 
         public ICommand PositionRenewCommand { get => new Command(PositionRenew); }
@@ -484,6 +502,7 @@ namespace CouchInsert
             CSSHU = Double.Parse(sourceAxis[6]);
             CSIHU = Double.Parse(sourceAxis[7]);
 
+
             string[] TempFilelines = File.ReadAllLines(FilePathCS);
             List<VVector> CSVVector = new List<VVector>();
             {
@@ -505,28 +524,64 @@ namespace CouchInsert
             //    }
             //}
 
+            double Multiple = ScriptContext.Image.ZRes;
+            bool is_integer = unchecked(Multiple == (int)Multiple); //confirm the z after
+
             if (StructureSet.Structures.Any(s => s.Id == "CouchSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CouchSurface"));
-            Structure CouchSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CouchSurface");
+            CouchSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CouchSurface");
 
             List<VVector> NewVVector = new List<VVector>();
             foreach (VVector vec in CSVVector)
             {
                 VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
                 NewVVector.Add(new VVector(vv.x, vv.y, vv.z));
-
             }
-            for (int i = Convert.ToInt32(NewVVector.Min(p => p.z)); i < NewVVector.Max(p => p.z); i ++)
+            int a = Convert.ToInt32(NewVVector.Min(p => p.z));
+            int b = Convert.ToInt32(NewVVector.Max(p => p.z));
+
+            List<VVector> Loop = new List<VVector>();
+            for (int i = a; i <= b; i++)
             {
-                CouchSurface.AddContourOnImagePlane(NewVVector.Where(a => a.z.Equals(Convert.ToDouble(i))).ToArray(), i);
+                Loop.Clear();
+                if (is_integer == true)
+                {
+                    foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i))))
+                    {
+                        Loop.Add(vec);
+                    }
+                }
+                else 
+                {
+                    if (i + (i - a) * Multiple == (int)(i + (i - a) * Multiple))
+                    {
+                        foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i + (i - a) * Multiple))))
+                        {
+                            Loop.Add(vec);
+                        }
+                    }
+                    else 
+                    {
+                        List<VVector> ForInterpolate = new List<VVector>();
+                        ForInterpolate.Clear();
+                        foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i + (i - a) * Multiple))))
+                        {
+                            ForInterpolate.Add(vec);
+                        }
+                        for (int index = 0; index < (ForInterpolate.Count - 1); index++)
+                        {
+                            Loop.Add(Interpolate(ForInterpolate[index], ForInterpolate[index+1]));
+                        }
+                    }
+                }
+                CouchSurface.AddContourOnImagePlane(Loop.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
             }
             CouchSurface.SetAssignedHU(CSHU);
 
-            //Array.Clear(Tempfilelines,0, Tempfilelines.Length);
+            //Array.Clear(TempFilelines, 0, TempFilelines.Length);
+            //TempFilelines = File.ReadAllLines(FilePathCI);
             //CSVVector.Clear();
-            //Tempfilelines = File.ReadAllLines(FilePathCSS);
-            //CSVVector = new List<VVector>();
             //{
-            //    foreach (string line in Tempfilelines)
+            //    foreach (string line in TempFilelines)
             //    {
             //        string[] splitLine = line.Split(',');
             //        double x = Double.Parse(splitLine[0].Trim());
@@ -535,24 +590,123 @@ namespace CouchInsert
             //        CSVVector.Add(new VVector(x, y, z));
             //    }
             //}
-            //TempFilelines.Clear();
-            //if (StructureSet.Structures.Any(s => s.Id == "CrossSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossSurface"));
-            //Structure CrossSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossSurface");
+            //if (StructureSet.Structures.Any(s => s.Id == "CouchInterior")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CouchInterior"));
+            //CouchInterior = ScriptContext.StructureSet.AddStructure("CONTROL", "CouchInterior");
 
+            //NewVVector.Clear();
             //foreach (VVector vec in CSVVector)
             //{
             //    VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
-            //    TempFilelines.Add(new VVector(vv.x, vv.y, vv.z));
+            //    NewVVector.Add(new VVector(vv.x, vv.y, vv.z));
             //}
-            //for (int i = 0; i < TempFilelines.Max(p => p.z); i++)
+            //a = Convert.ToInt32(NewVVector.Min(p => p.z));
+            //b = Convert.ToInt32(NewVVector.Max(p => p.z));
+
+            //for (int i = a; i <= b; i++)
             //{
-            //    CrossSurface.AddContourOnImagePlane(TempFilelines.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+            //    Loop.Clear();
+            //    if (is_integer == true)
+            //    {
+            //        foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i * Multiple))))
+            //        {
+            //            Loop.Add(vec);
+            //        }
+            //    }
+            //    else
+            //    {
+            //        if ((i - a) % Multiple == 0)
+            //        {
+            //            foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i))))
+            //            {
+            //                Loop.Add(vec);
+            //            }
+            //        }
+            //        else
+            //        {
+            //            List<VVector> ForInterpolate = new List<VVector>();
+            //            ForInterpolate.Clear();
+            //            foreach (VVector vec in NewVVector.Where(vv => vv.z.Equals(Convert.ToDouble(i))))
+            //            {
+            //                ForInterpolate.Add(vec);
+            //            }
+            //            for (int index = 0; index < (ForInterpolate.Count - 1); index++)
+            //            {
+            //                Loop.Add(Interpolate(ForInterpolate[index], ForInterpolate[index + 1]));
+            //            }
+            //        }
+            //    }
+            //    CouchInterior.AddContourOnImagePlane(Loop.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+            //}
+            //CouchSurface.SetAssignedHU(CIHU);
+
+            //CouchSurface.SegmentVolume.Sub(CouchInterior.SegmentVolume);
+
+            //Array.Clear(TempFilelines, 0, TempFilelines.Length);
+            //CSVVector.Clear();
+            //TempFilelines = File.ReadAllLines(FilePathCSS);
+            //{
+            //    foreach (string line in TempFilelines)
+            //    {
+            //        string[] splitLine = line.Split(',');
+            //        double x = Double.Parse(splitLine[0].Trim());
+            //        double y = Double.Parse(splitLine[1].Trim());
+            //        double z = Double.Parse(splitLine[2].Trim());
+            //        CSVVector.Add(new VVector(x, y, z));
+            //    }
+            //}
+
+            //if (StructureSet.Structures.Any(s => s.Id == "CrossSurface")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossSurface"));
+            //CrossSurface = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossSurface");
+
+            //NewVVector.Clear();
+            //foreach (VVector vec in CSVVector)
+            //{
+            //    VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
+            //    NewVVector.Add(new VVector(vv.x, vv.y, vv.z));
+            //}
+            //for (int i = 0; i < NewVVector.Max(p => p.z); i++)
+            //{
+            //    CrossSurface.AddContourOnImagePlane(NewVVector.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
             //}
             //CrossSurface.SetAssignedHU(CSSHU);
 
+            //Array.Clear(TempFilelines, 0, TempFilelines.Length);
+            //CSVVector.Clear();
+            //TempFilelines = File.ReadAllLines(FilePathCSI);
+            //{
+            //    foreach (string line in TempFilelines)
+            //    {
+            //        string[] splitLine = line.Split(',');
+            //        double x = Double.Parse(splitLine[0].Trim());
+            //        double y = Double.Parse(splitLine[1].Trim());
+            //        double z = Double.Parse(splitLine[2].Trim());
+            //        CSVVector.Add(new VVector(x, y, z));
+            //    }
+            //}
+
+            //if (StructureSet.Structures.Any(s => s.Id == "CrossInterior")) StructureSet.RemoveStructure(StructureSet.Structures.First(s => s.Id == "CrossInterior"));
+            //CrossInterior = ScriptContext.StructureSet.AddStructure("CONTROL", "CrossInterior");
+
+            //NewVVector.Clear();
+            //foreach (VVector vec in CSVVector)
+            //{
+            //    VVector vv = AxisAlignment(vec, SelectedMarkerPosition, MaxMinDetect(CSVVector)[0], MaxMinDetect(CSVVector)[1], MaxMinDetect(CSVVector)[2]);
+            //    NewVVector.Add(new VVector(vv.x, vv.y, vv.z));
+            //}
+            //for (int i = 0; i < NewVVector.Max(p => p.z); i++)
+            //{
+            //    CrossSurface.AddContourOnImagePlane(NewVVector.Select(v => new VVector(v.x, v.y, v.z)).ToArray(), i);
+            //}
+            //CrossInterior.SetAssignedHU(CSIHU);
         }
 
-
+        public VVector Interpolate(VVector Input, VVector Next)
+        {
+            double x = (Input.x + Next.x) / 2;
+            double y = (Input.y + Next.y) / 2;
+            double z = Input.z;
+            return new VVector(x, y, z);
+        }
 
         public static void CreateSphere(MeshGeometry3D mesh, double radius, int subdivisions)
         {
@@ -777,7 +931,7 @@ namespace CouchInsert
             //The value of YAxis is opposite
             double X = MarkerLocationXX - XBaseAxis - Xmin;
             double Y = MarkerLocationYY + YBaseAxis - Ymax;
-            double Z = MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z -Zmin;
+            double Z = MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z - Zmin;
             //double SSZAdd = Convert.ToInt32((MarkerLocationZZ - ZBaseAxis - ScriptContext.Image.Origin.z) / ScriptContext.Image.ZRes);
             var mapAxis = new Dictionary<string, VVector>()
             {
@@ -789,7 +943,7 @@ namespace CouchInsert
                 {"0",  new VVector ( Original.x + X, Original.y + Y, Convert.ToInt32((Original.z + Z + 3 * HSpace)/ ScriptContext.Image.ZRes))},
             };
             VVector output;
-            return mapAxis.TryGetValue(LockBarType, out output) ? output : new VVector(0,0,0);
+            return mapAxis.TryGetValue(LockBarType, out output) ? output : new VVector(0, 0, 0);
         }
         public double[] MaxMinDetect(List<VVector> VVectors)
         {

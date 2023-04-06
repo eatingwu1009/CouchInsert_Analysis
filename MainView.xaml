@@ -99,6 +99,11 @@
             <TextBox Grid.Row="2" Grid.Column="2" HorizontalAlignment="Stretch" TextWrapping="Wrap" Foreground="Black" FontSize="14"  Text="{Binding MarkerLocationZ, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
             <Button Grid.Row="3" Grid.Column="3" Content="APPLY⏳" Command="{Binding ApplyCommand}" Cursor="Hand" HorizontalAlignment="Right"/>
         </Grid>
+        
+        <Grid Background="LightCoral" Margin="0,0,0,0" >
+            <ProgressBar Value="{Binding CurrentProgress, Mode=OneWay}" Visibility="{Binding ProgressVisibility}" Minimum="0" Maximum="100" Name="pbStatus" Height="25"/>
+            <TextBlock Text="{Binding ElementName=pbStatus, Path=Value, StringFormat={}{0:0}%}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Grid>
 
         <Grid Background="Black" Margin="0,0,0,0" >
             <Grid.ColumnDefinitions>
@@ -116,6 +121,6 @@
             <Button Grid.Row="2" Content="BuildModel" Command="{Binding ButtonCommand_BuildModel}" FontSize="14" FontWeight="Bold" Cursor="Hand" HorizontalAlignment="Left" FontFamily="Segoe UI Light" Style="{StaticResource ButtonStyle}" Margin="290,0,0,10" Grid.ColumnSpan="2"/>
             <Label Grid.Row="1" Content=" Couch Names : CouchInterior, CouchSurface, CrossInterior, CrossSurface"  Foreground="white"  FontSize="12" Grid.ColumnSpan="3" />
         </Grid>
-
     </StackPanel>
+            
 </UserControl>

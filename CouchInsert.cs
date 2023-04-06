@@ -9,6 +9,7 @@ using VMS.TPS.Common.Model.API;
 using VMS.TPS.Common.Model.Types;
 using CouchInsert;
 using System.IO;
+using System.ComponentModel;
 
 // TODO: Replace the following version attributes by creating AssemblyInfo.cs. You can do this in the properties of the Visual Studio project.
 [assembly: AssemblyVersion("1.0.0.1")]
@@ -39,6 +40,7 @@ namespace VMS.TPS
             window.Width = 415;
             window.Top = 400;
             window.Left = 1200;
+
         }
     }
 }
