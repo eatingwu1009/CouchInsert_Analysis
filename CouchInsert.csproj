@@ -66,6 +66,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="SegmentShifter.cs" />
     <Compile Include="Command.cs" />
     <Compile Include="CouchInsert.cs" />
     <Compile Include="MainView.xaml.cs">
